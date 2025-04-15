@@ -1,110 +1,28 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import Papa from 'papaparse';
 import * as _ from 'lodash';
 
-// Paleta de colores accesible para múltiples archivos
-const CHART_COLORS = [
-  '#2563eb', // Azul
-  '#16a34a', // Verde
-  '#ea580c', // Naranja
-  '#dc2626', // Rojo
-  '#9333ea', // Púrpura
-  '#be123c', // Rosa
-  '#0891b2', // Cyan
-  '#eab308', // Amarillo
-  '#4f46e5', // Índigo
-  '#f97316', // Naranja claro
-  '#84cc16', // Lima
-  '#06b6d4', // Celeste
-  '#ec4899', // Rosa claro
-  '#8b5cf6', // Violeta
-  '#14b8a6', // Turquesa
-];
-
-// Componente para la tabla de resumen de métricas
-const MetricSummaryTable = ({ datasets, metric, title, unit = '', formatFunc = null }) => {
-  if (!datasets || datasets.length === 0) return null;
-  
-  // Calcular estadísticas para cada dataset
-  const summaryData = datasets.map(dataset => {
-    const values = dataset.filteredData.map(item => item[metric]).filter(v => v !== undefined && v !== null);
-    
-    if (values.length === 0) {
-      return {
-        id: dataset.id,
-        name: dataset.name,
-        color: dataset.color,
-        min: '-',
-        max: '-',
-        avg: '-'
-      };
-    }
-    
-    const min = Math.min(...values);
-    const max = Math.max(...values);
-    const avg = values.reduce((sum, val) => sum + val, 0) / values.length;
-    
-    // Formatear valores si se proporciona una función de formato
-    const format = (value) => {
-      if (formatFunc) return formatFunc(value);
-      return `${parseFloat(value.toFixed(2))}${unit}`;
-    };
-    
-    return {
-      id: dataset.id,
-      name: dataset.name,
-      color: dataset.color,
-      min: format(min),
-      max: format(max),
-      avg: format(avg)
-    };
-  });
-  
-  return (
-    <div className="bg-white p-6 rounded-lg shadow-md mb-6">
-      <h3 className="text-lg font-semibold mb-4 text-gray-700">{title}</h3>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Archivo</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mínimo</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Máximo</th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Promedio</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {summaryData.map((item, index) => (
-              <tr key={index} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
-                <td className="px-4 py-3 whitespace-nowrap">
-                  <div className="flex items-center">
-                    <span className="inline-block w-3 h-3 rounded-full mr-2" style={{ backgroundColor: item.color }}></span>
-                    <span className="font-medium">{item.name}</span>
-                  </div>
-                </td>
-                <td className="px-4 py-3 whitespace-nowrap">{item.min}</td>
-                <td className="px-4 py-3 whitespace-nowrap">{item.max}</td>
-                <td className="px-4 py-3 whitespace-nowrap">{item.avg}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-};
-
-// Componente principal
 const GraficosRendimiento = () => {
   const [datasets, setDatasets] = useState([]); // Array de datasets
   const [loading, setLoading] = useState(false);
   const [filteredDatasets, setFilteredDatasets] = useState([]); // Datasets filtrados por tiempo
   const [combinedData, setCombinedData] = useState([]);
   const [timeRange, setTimeRange] = useState(60); // Mostrar los últimos X segundos
-  const [fileName, setFileName] = useState(''); // Estado para el nombre del archivo
-  
-  const fileInputRef = useRef(null); // Referencia para limpiar el input de archivo
+  const [colors] = useState([
+    '#2563EB', // azul intenso
+    '#16A34A', // verde intenso
+    '#EA580C', // naranja intenso
+    '#DC2626', // rojo intenso
+    '#7E22CE', // púrpura intenso
+    '#DB2777', // rosa intenso
+    '#0E7490', // teal intenso
+    '#CA8A04', // amarillo intenso
+    '#4338CA', // indigo intenso
+    '#E11D48', // rojo cereza
+    '#059669', // esmeralda
+    '#0369A1', // azul marino
+  ]);
   
   useEffect(() => {
     if (datasets.length > 0) {
@@ -112,7 +30,6 @@ const GraficosRendimiento = () => {
     }
   }, [timeRange, datasets]);
   
-  // Manejo de carga de archivos
   const handleAddFile = (e) => {
     setLoading(true);
     const file = e.target.files[0];
@@ -127,34 +44,25 @@ const GraficosRendimiento = () => {
         });
         
         // Asignar un color del pool de colores
-        const colorIndex = datasets.length % CHART_COLORS.length;
-        const color = CHART_COLORS[colorIndex];
-        
-        // Usar el nombre personalizado si está disponible, o el nombre del archivo
-        const displayName = fileName.trim() || file.name;
+        const colorIndex = datasets.length % colors.length;
+        const color = colors[colorIndex];
         
         const processedData = processDatos(result.data, datasets.length);
         
         setDatasets(prev => [...prev, {
           id: datasets.length,
-          name: displayName,
+          name: file.name,
           color: color,
           data: processedData.data,
           stats: processedData.stats
         }]);
         
-        // Limpiar el input de archivo y el nombre
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
-        setFileName('');
         setLoading(false);
       };
       reader.readAsText(file);
     }
   };
   
-  // Eliminar un dataset
   const removeDataset = (index) => {
     setDatasets(prev => {
       const newDatasets = prev.filter(dataset => dataset.id !== index);
@@ -169,7 +77,6 @@ const GraficosRendimiento = () => {
     });
   };
   
-  // Procesar datos del CSV
   const processDatos = (rawData, datasetId) => {
     const groupedBySecond = _.groupBy(rawData, 'fecha_ejecucion');
 
@@ -202,24 +109,14 @@ const GraficosRendimiento = () => {
 
     const stats = {
       totalSegundos: datosOrdenados.length,
-      promedioPeticionesPorSegundo: Math.round(datosOrdenados.reduce((sum, item) => sum + item.num_peticiones, 0) / Math.max(1, datosOrdenados.length)),
+      promedioPeticionesPorSegundo: Math.round(datosOrdenados.reduce((sum, item) => sum + item.num_peticiones, 0) / datosOrdenados.length),
       maxPeticionesPorSegundo: Math.max(...datosOrdenados.map(item => item.num_peticiones)),
       minPeticionesPorSegundo: Math.min(...datosOrdenados.map(item => item.num_peticiones)),
-      promedioTiempoEjecucion: Math.round(datosOrdenados.reduce((sum, item) => sum + item.tp_ejec, 0) / Math.max(1, datosOrdenados.length)),
-      maxTiempoEjecucion: Math.max(...datosOrdenados.map(item => item.tp_ejec)),
-      minTiempoEjecucion: Math.min(...datosOrdenados.map(item => item.tp_ejec)),
-      promedioTiempoRespuesta: Math.round(datosOrdenados.reduce((sum, item) => sum + item.tp_resp, 0) / Math.max(1, datosOrdenados.length)),
-      maxTiempoRespuesta: Math.max(...datosOrdenados.map(item => item.tp_resp)),
-      minTiempoRespuesta: Math.min(...datosOrdenados.map(item => item.tp_resp)),
-      promedioCPU: parseFloat((datosOrdenados.reduce((sum, item) => sum + item.cpu_uso, 0) / Math.max(1, datosOrdenados.length)).toFixed(2)),
-      maxCPU: Math.max(...datosOrdenados.map(item => item.cpu_uso)),
-      minCPU: Math.min(...datosOrdenados.map(item => item.cpu_uso)),
-      promedioRAM: parseFloat((datosOrdenados.reduce((sum, item) => sum + item.ram_uso, 0) / Math.max(1, datosOrdenados.length)).toFixed(2)),
-      maxRAM: Math.max(...datosOrdenados.map(item => item.ram_uso)),
-      minRAM: Math.min(...datosOrdenados.map(item => item.ram_uso)),
-      promedioLatencia: parseFloat((datosOrdenados.reduce((sum, item) => sum + item.latencia, 0) / Math.max(1, datosOrdenados.length)).toFixed(2)),
-      maxLatencia: Math.max(...datosOrdenados.map(item => item.latencia)),
-      minLatencia: Math.min(...datosOrdenados.map(item => item.latencia))
+      promedioTiempoEjecucion: Math.round(datosOrdenados.reduce((sum, item) => sum + item.tp_ejec, 0) / datosOrdenados.length),
+      promedioTiempoRespuesta: Math.round(datosOrdenados.reduce((sum, item) => sum + item.tp_resp, 0) / datosOrdenados.length),
+      promedioCPU: (datosOrdenados.reduce((sum, item) => sum + item.cpu_uso, 0) / datosOrdenados.length).toFixed(2),
+      promedioRAM: (datosOrdenados.reduce((sum, item) => sum + item.ram_uso, 0) / datosOrdenados.length).toFixed(2),
+      promedioLatencia: (datosOrdenados.reduce((sum, item) => sum + item.latencia, 0) / datosOrdenados.length).toFixed(2)
     };
     
     return {
@@ -228,7 +125,6 @@ const GraficosRendimiento = () => {
     };
   };
   
-  // Actualizar datos filtrados basados en el rango de tiempo
   const updateFilteredData = (allDatasets, range) => {
     // Filtrar cada dataset para mostrar solo los últimos 'range' segundos
     const filtered = allDatasets.map(dataset => {
@@ -283,7 +179,6 @@ const GraficosRendimiento = () => {
     setCombinedData(combined);
   };
   
-  // Funciones de cálculo para el procesamiento de datos
   const calcularPromedio = (datos, campo) => {
     const valores = datos.map(row => row[campo]).filter(val => val !== null && val !== undefined && !isNaN(val));
     if (valores.length === 0) return 0;
@@ -312,292 +207,168 @@ const GraficosRendimiento = () => {
     return contadorTrue / valores.length > 0.5;
   };
   
-  // Renderizar los indicadores de leyenda para cada dataset
-  const renderLegend = (datasets) => {
-    if (!datasets || datasets.length === 0) return null;
+  // Crear una tabla de promedios para una métrica específica en todos los datasets
+  const renderAveragesTable = (metric, title, unit = '') => {
+    if (filteredDatasets.length === 0) return null;
+    
+    // Calcular promedio para cada dataset en el período de tiempo filtrado
+    const averages = filteredDatasets.map(dataset => {
+      const values = dataset.filteredData.map(item => item[metric]);
+      const avg = values.reduce((sum, val) => sum + val, 0) / values.length;
+      return {
+        id: dataset.id,
+        name: dataset.name,
+        color: dataset.color,
+        average: parseFloat(avg.toFixed(2))
+      };
+    });
+    
+    // Ordenar por promedio descendente
+    const sortedAverages = [...averages].sort((a, b) => b.average - a.average);
     
     return (
-      <div className="flex flex-wrap justify-end mb-4">
-        {datasets.map((dataset) => (
-          <div key={dataset.id} className="flex items-center mr-4 mb-2">
-            <div 
-              className="w-3 h-3 rounded-full mr-1"
-              style={{ backgroundColor: dataset.color }}
-            ></div>
-            <span className="text-sm text-gray-700">{dataset.name}</span>
-          </div>
-        ))}
+      <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200 overflow-hidden">
+        <h3 className="text-lg font-bold mb-4 text-gray-800 border-b-2 border-gray-200 pb-2">{title} - Promedios</h3>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200 border">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b-2 border-gray-300">Archivo</th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b-2 border-gray-300">Promedio</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {sortedAverages.map((item, index) => (
+                <tr key={index} 
+                    className="hover:bg-gray-50 transition-colors duration-200"
+                    style={{ backgroundColor: index % 2 === 0 ? `${item.color}15` : 'white' }}>
+                  <td className="px-6 py-4 whitespace-nowrap border-r border-gray-200">
+                    <div className="flex items-center">
+                      <span className="inline-block w-4 h-4 mr-3 rounded-sm border border-gray-300" 
+                            style={{ backgroundColor: item.color }}></span>
+                      <span className="font-medium">{item.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap font-bold" style={{ color: item.color }}>
+                    {item.average}{unit}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   };
   
-  // Spinner de carga mejorado
   if (loading && datasets.length === 0) {
-    return (
-      <div className="flex items-center justify-center min-h-screen p-6 bg-gray-50">
-        <div className="text-center">
-          <div className="w-16 h-16 border-4 border-t-blue-500 border-gray-200 rounded-full animate-spin mx-auto mb-4"></div>
-          <p className="text-lg font-medium text-gray-700">Cargando datos...</p>
-        </div>
-      </div>
-    );
+    return <div className="p-4 text-center">Cargando datos...</div>;
   }
 
   return (
-    <div className="p-6 md:p-8 bg-gray-50 min-h-screen">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8 text-center text-gray-800">Análisis Comparativo de Rendimiento</h1>
-        
-        {/* Sección de carga de archivos */}
-        <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-          <h2 className="text-xl font-semibold mb-4 text-gray-700">Agregar Archivos CSV</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            <div>
-              <label htmlFor="file-name" className="block text-sm font-medium text-gray-700 mb-2">
-                Nombre para el archivo (opcional)
-              </label>
-              <input
-                id="file-name"
-                type="text"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500"
-                placeholder="Ej: Prueba A - 500 usuarios"
-                value={fileName}
-                onChange={(e) => setFileName(e.target.value)}
-              />
-            </div>
-            <div>
-              <label htmlFor="csv-file" className="block text-sm font-medium text-gray-700 mb-2">
-                Seleccionar archivo CSV
-              </label>
-              <input
-                id="csv-file"
-                type="file"
-                ref={fileInputRef}
-                accept=".csv"
-                onChange={handleAddFile}
-                disabled={loading}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-              />
-            </div>
-          </div>
-          
-          {loading && (
-            <div className="flex items-center justify-center p-4 mb-4 bg-blue-50 rounded-lg">
-              <div className="w-6 h-6 border-2 border-t-blue-500 border-blue-200 rounded-full animate-spin mr-3"></div>
-              <p className="text-blue-700">Cargando archivo...</p>
-            </div>
-          )}
-          
-          {/* Lista de archivos cargados */}
-          {datasets.length > 0 && (
-            <div className="mt-6">
-              <h3 className="text-lg font-medium mb-4 text-gray-600">Archivos Cargados</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {datasets.map((dataset) => (
-                  <div 
-                    key={dataset.id} 
-                    className="p-5 rounded-lg shadow-md border border-gray-100"
-                    style={{ 
-                      backgroundColor: `${dataset.color}10`, 
-                      borderLeft: `4px solid ${dataset.color}` 
-                    }}
-                  >
-                    <div className="flex justify-between items-center mb-3">
-                      <div className="flex items-center">
-                        <div 
-                          className="w-4 h-4 rounded-full mr-2"
-                          style={{ backgroundColor: dataset.color }}
-                        ></div>
-                        <h4 className="font-medium text-gray-800">{dataset.name}</h4>
-                      </div>
-                      <button 
-                        onClick={() => removeDataset(dataset.id)}
-                        className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded-full hover:bg-red-50"
-                        aria-label={`Eliminar ${dataset.name}`}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                          <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                        </svg>
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Peticiones/s:</span>
-                        <span className="font-semibold text-gray-800">{dataset.stats.promedioPeticionesPorSegundo}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">T. Ejecución:</span>
-                        <span className="font-semibold text-gray-800">{dataset.stats.promedioTiempoEjecucion} ms</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">CPU:</span>
-                        <span className="font-semibold text-gray-800">{dataset.stats.promedioCPU}%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">RAM:</span>
-                        <span className="font-semibold text-gray-800">{dataset.stats.promedioRAM}%</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Latencia:</span>
-                        <span className="font-semibold text-gray-800">{dataset.stats.promedioLatencia} ms</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Segundos:</span>
-                        <span className="font-semibold text-gray-800">{dataset.stats.totalSegundos}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+    <div className="max-w-7xl mx-auto px-6 py-8 bg-gray-100 min-h-screen">
+      <h1 className="text-3xl font-bold mb-8 text-center text-gray-800 border-b-4 border-blue-600 pb-4 max-w-3xl mx-auto">Análisis Comparativo de Rendimiento</h1>
+      
+      <div className="mb-8 bg-white p-6 rounded-lg shadow-lg border border-gray-200">
+        <h2 className="text-xl font-bold mb-6 text-gray-800 border-l-4 border-blue-600 pl-3">Agregar Archivos CSV</h2>
+        <div className="flex flex-wrap items-center">
+          <label className="flex items-center justify-center px-4 py-3 bg-blue-600 text-white rounded-lg shadow-md hover:bg-blue-700 transition cursor-pointer mb-4 mr-4">
+            <span>Seleccionar archivo CSV</span>
+            <input 
+              type="file" 
+              accept=".csv" 
+              onChange={handleAddFile} 
+              className="hidden"
+              disabled={loading}
+            />
+          </label>
         </div>
         
         {datasets.length > 0 && (
-          <>
-            {/* Panel comparativo de estadísticas generales */}
-            <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-              <h2 className="text-xl font-semibold mb-6 text-gray-700">Comparativa General</h2>
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Archivo</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Peticiones/s</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">T. Ejecución</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">T. Respuesta</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CPU %</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RAM %</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Latencia</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {datasets.map((dataset, index) => (
-                      <tr key={dataset.id} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <span 
-                              className="w-3 h-3 rounded-full mr-2"
-                              style={{ backgroundColor: dataset.color }}
-                            ></span>
-                            <span className="font-medium text-gray-800">{dataset.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="text-gray-800">{dataset.stats.promedioPeticionesPorSegundo}</div>
-                          <div className="text-xs text-gray-500">
-                            (min: {dataset.stats.minPeticionesPorSegundo}, max: {dataset.stats.maxPeticionesPorSegundo})
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="text-gray-800">{dataset.stats.promedioTiempoEjecucion} ms</div>
-                          <div className="text-xs text-gray-500">
-                            (min: {dataset.stats.minTiempoEjecucion}, max: {dataset.stats.maxTiempoEjecucion})
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="text-gray-800">{dataset.stats.promedioTiempoRespuesta} ms</div>
-                          <div className="text-xs text-gray-500">
-                            (min: {dataset.stats.minTiempoRespuesta}, max: {dataset.stats.maxTiempoRespuesta})
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="text-gray-800">{dataset.stats.promedioCPU}%</div>
-                          <div className="text-xs text-gray-500">
-                            (min: {dataset.stats.minCPU.toFixed(1)}%, max: {dataset.stats.maxCPU.toFixed(1)}%)
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="text-gray-800">{dataset.stats.promedioRAM}%</div>
-                          <div className="text-xs text-gray-500">
-                            (min: {dataset.stats.minRAM.toFixed(1)}%, max: {dataset.stats.maxRAM.toFixed(1)}%)
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <div className="text-gray-800">{dataset.stats.promedioLatencia} ms</div>
-                          <div className="text-xs text-gray-500">
-                            (min: {dataset.stats.minLatencia.toFixed(1)}, max: {dataset.stats.maxLatencia.toFixed(1)})
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+          <div className="mt-8">
+            <h3 className="text-lg font-semibold mb-4 text-gray-800 border-l-4 border-green-600 pl-3">Archivos Cargados</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {datasets.map((dataset, index) => (
+                <div key={index} className="p-5 rounded-lg shadow-lg border-2" 
+                     style={{ 
+                       backgroundColor: `${dataset.color}10`, 
+                       borderColor: dataset.color 
+                     }}>
+                  <div className="flex justify-between items-center mb-3">
+                    <div className="font-bold text-gray-800 flex items-center">
+                      <div className="w-4 h-4 mr-2 rounded-sm" style={{ backgroundColor: dataset.color }}></div>
+                      {dataset.name}
+                    </div>
+                    <button 
+                      onClick={() => removeDataset(dataset.id)}
+                      className="bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center hover:bg-red-700 transition"
+                    >
+                      ×
+                    </button>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-4 text-sm bg-white p-3 rounded-lg border border-gray-200">
+                    <div className="py-1">Peticiones/s: <span className="font-bold text-gray-800">{dataset.stats.promedioPeticionesPorSegundo}</span></div>
+                    <div className="py-1">T. Ejecución: <span className="font-bold text-gray-800">{dataset.stats.promedioTiempoEjecucion} ms</span></div>
+                    <div className="py-1">CPU: <span className="font-bold text-gray-800">{dataset.stats.promedioCPU}%</span></div>
+                    <div className="py-1">RAM: <span className="font-bold text-gray-800">{dataset.stats.promedioRAM}%</span></div>
+                  </div>
+                </div>
+              ))}
             </div>
-            
-            {/* Controles de rango de tiempo */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6">
-              <h2 className="text-xl font-semibold text-gray-700 mb-4 md:mb-0">Gráficos Comparativos</h2>
-              <div className="inline-flex items-center p-1 bg-gray-100 rounded-lg">
-                <button 
-                  onClick={() => setTimeRange(30)}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    timeRange === 30 
-                      ? 'bg-blue-500 text-white shadow-sm' 
-                      : 'text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  30s
-                </button>
-                <button 
-                  onClick={() => setTimeRange(60)}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    timeRange === 60 
-                      ? 'bg-blue-500 text-white shadow-sm' 
-                      : 'text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  60s
-                </button>
-                <button 
-                  onClick={() => setTimeRange(120)}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    timeRange === 120 
-                      ? 'bg-blue-500 text-white shadow-sm' 
-                      : 'text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  120s
-                </button>
-                <button 
-                  onClick={() => setTimeRange(Math.max(...datasets.map(d => d.data.length)))}
-                  className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                    timeRange === Math.max(...datasets.map(d => d.data.length)) 
-                      ? 'bg-blue-500 text-white shadow-sm' 
-                      : 'text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  Todo
-                </button>
-              </div>
+          </div>
+        )}
+      </div>
+      
+      {datasets.length > 0 && (
+        <>
+          <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-6 rounded-lg shadow-lg border border-gray-200">
+            <h2 className="text-xl font-bold mb-4 md:mb-0 text-gray-800 border-l-4 border-purple-600 pl-3">Gráficos Comparativos</h2>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setTimeRange(30)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium shadow-md transition-all ${timeRange === 30 ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+              >
+                30s
+              </button>
+              <button 
+                onClick={() => setTimeRange(60)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium shadow-md transition-all ${timeRange === 60 ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+              >
+                60s
+              </button>
+              <button 
+                onClick={() => setTimeRange(120)}
+                className={`px-4 py-2 rounded-lg text-sm font-medium shadow-md transition-all ${timeRange === 120 ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+              >
+                120s
+              </button>
+              <button 
+                onClick={() => setTimeRange(Math.max(...datasets.map(d => d.data.length)))}
+                className={`px-4 py-2 rounded-lg text-sm font-medium shadow-md transition-all ${timeRange === Math.max(...datasets.map(d => d.data.length)) ? 'bg-purple-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}`}
+              >
+                Todo
+              </button>
             </div>
+          </div>
 
-            {/* Tablas de resumen de métricas */}
-            <MetricSummaryTable 
-              datasets={filteredDatasets} 
-              metric="num_peticiones" 
-              title="Resumen: Peticiones por Segundo" 
-            />
-            
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
             {/* Gráfico Peticiones por Segundo */}
-            <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-              <h3 className="text-lg font-semibold mb-4 text-gray-700">Peticiones por Segundo</h3>
-              {renderLegend(filteredDatasets)}
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={combinedData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#edf2f7" />
-                    <XAxis 
-                      dataKey="label" 
-                      tick={{ fill: '#4a5568' }}
-                      axisLine={{ stroke: '#cbd5e0' }}
-                    />
-                    <YAxis 
-                      tick={{ fill: '#4a5568' }}
-                      axisLine={{ stroke: '#cbd5e0' }}
-                    />
+            <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
+              <h3 className="text-lg font-bold mb-4 text-gray-800 border-b-2 border-gray-200 pb-2">Peticiones por Segundo</h3>
+              <div className="flex justify-end mb-4 text-sm flex-wrap bg-gray-50 p-2 rounded-lg">
+                {filteredDatasets.map((dataset, index) => (
+                  <span key={index} className="mr-4 mb-1 bg-white px-2 py-1 rounded-md shadow-sm border border-gray-200">
+                    <span className="inline-block w-4 h-4 mr-2 rounded-sm" style={{ backgroundColor: dataset.color }}></span> 
+                    {dataset.name}
+                  </span>
+                ))}
+              </div>
+              <div className="border border-gray-200 rounded-lg p-2 bg-gray-50">
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={combinedData} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
+                    <XAxis dataKey="label" tick={{ fill: '#4b5563' }} />
+                    <YAxis tick={{ fill: '#4b5563' }} />
                     <Tooltip 
                       formatter={(value, name) => {
                         const datasetId = name.split('_').pop();
@@ -606,8 +377,10 @@ const GraficosRendimiento = () => {
                       }}
                       labelFormatter={(label) => `Segundo: ${label}`}
                       contentStyle={{ 
-                        borderRadius: '6px', 
-                        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)' 
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '6px',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
                       }}
                     />
                     <Legend content={() => null} />
@@ -625,30 +398,23 @@ const GraficosRendimiento = () => {
               </div>
             </div>
             
-            <MetricSummaryTable 
-              datasets={filteredDatasets} 
-              metric="tp_ejec" 
-              title="Resumen: Tiempo de Ejecución (ms)" 
-              unit=" ms" 
-            />
-            
             {/* Gráfico Tiempo de Ejecución */}
-            <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-              <h3 className="text-lg font-semibold mb-4 text-gray-700">Tiempo de Ejecución (ms)</h3>
-              {renderLegend(filteredDatasets)}
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={combinedData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#edf2f7" />
-                    <XAxis 
-                      dataKey="label" 
-                      tick={{ fill: '#4a5568' }}
-                      axisLine={{ stroke: '#cbd5e0' }}
-                    />
-                    <YAxis 
-                      tick={{ fill: '#4a5568' }}
-                      axisLine={{ stroke: '#cbd5e0' }}
-                    />
+            <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
+              <h3 className="text-lg font-bold mb-4 text-gray-800 border-b-2 border-gray-200 pb-2">Tiempo de Ejecución</h3>
+              <div className="flex justify-end mb-4 text-sm flex-wrap bg-gray-50 p-2 rounded-lg">
+                {filteredDatasets.map((dataset, index) => (
+                  <span key={index} className="mr-4 mb-1 bg-white px-2 py-1 rounded-md shadow-sm border border-gray-200">
+                    <span className="inline-block w-4 h-4 mr-2 rounded-sm" style={{ backgroundColor: dataset.color }}></span> 
+                    {dataset.name}
+                  </span>
+                ))}
+              </div>
+              <div className="border border-gray-200 rounded-lg p-2 bg-gray-50">
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={combinedData} margin={{ top: 10, right: 10, left: 10, bottom: 10 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
+                    <XAxis dataKey="label" tick={{ fill: '#4b5563' }} />
+                    <YAxis tick={{ fill: '#4b5563' }} />
                     <Tooltip 
                       formatter={(value, name) => {
                         const datasetId = name.split('_').pop();
@@ -657,8 +423,10 @@ const GraficosRendimiento = () => {
                       }}
                       labelFormatter={(label) => `Segundo: ${label}`}
                       contentStyle={{ 
-                        borderRadius: '6px', 
-                        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)' 
+                        backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                        border: '1px solid #e5e7eb',
+                        borderRadius: '6px',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
                       }}
                     />
                     <Legend content={() => null} />
@@ -668,285 +436,225 @@ const GraficosRendimiento = () => {
                         type="monotone" 
                         dataKey={`tp_ejec_${dataset.id}`} 
                         stroke={dataset.color} 
-                        name={`T. Ejecución_${dataset.id}`}
                         strokeWidth={2}
-                        dot={{ r: 3, fill: dataset.color, strokeWidth: 0 }}
-                        activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
+                        dot={{ fill: dataset.color, strokeWidth: 1, r: 4 }}
+                        activeDot={{ r: 6, strokeWidth: 0 }}
+                        name={`T. Ejecución_${dataset.id}`} 
                       />
                     ))}
                   </LineChart>
                 </ResponsiveContainer>
               </div>
             </div>
-            
-            <MetricSummaryTable 
-              datasets={filteredDatasets} 
-              metric="tp_resp" 
-              title="Resumen: Tiempo de Respuesta (ms)" 
-              unit=" ms" 
-            />
             
             {/* Gráfico Tiempo de Respuesta */}
-            <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-              <h3 className="text-lg font-semibold mb-4 text-gray-700">Tiempo de Respuesta (ms)</h3>
-              {renderLegend(filteredDatasets)}
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={combinedData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#edf2f7" />
-                    <XAxis 
-                      dataKey="label" 
-                      tick={{ fill: '#4a5568' }}
-                      axisLine={{ stroke: '#cbd5e0' }}
-                    />
-                    <YAxis 
-                      tick={{ fill: '#4a5568' }}
-                      axisLine={{ stroke: '#cbd5e0' }}
-                    />
-                    <Tooltip 
-                      formatter={(value, name) => {
-                        const datasetId = name.split('_').pop();
-                        const dataset = datasets.find(d => d.id === parseInt(datasetId));
-                        return [`${value} ms`, dataset ? dataset.name : name];
-                      }}
-                      labelFormatter={(label) => `Segundo: ${label}`}
-                      contentStyle={{ 
-                        borderRadius: '6px', 
-                        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)' 
-                      }}
-                    />
-                    <Legend content={() => null} />
-                    {filteredDatasets.map((dataset) => (
-                      <Line 
-                        key={dataset.id}
-                        type="monotone" 
-                        dataKey={`tp_resp_${dataset.id}`} 
-                        stroke={dataset.color} 
-                        name={`T. Respuesta_${dataset.id}`}
-                        strokeWidth={2}
-                        dot={{ r: 3, fill: dataset.color, strokeWidth: 0 }}
-                        activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
-                      />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
+            <div className="bg-white p-4 rounded shadow">
+              <h3 className="text-md font-semibold mb-4">Tiempo de Respuesta</h3>
+              <div className="flex justify-end mb-2 text-sm flex-wrap">
+                {filteredDatasets.map((dataset, index) => (
+                  <span key={index} className="mr-4 mb-1">
+                    <span className="inline-block w-3 h-3 mr-1" style={{ backgroundColor: dataset.color }}></span> 
+                    {dataset.name}
+                  </span>
+                ))}
               </div>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={combinedData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="label" />
+                  <YAxis />
+                  <Tooltip 
+                    formatter={(value, name) => {
+                      const datasetId = name.split('_').pop();
+                      const dataset = datasets.find(d => d.id === parseInt(datasetId));
+                      return [`${value} ms`, dataset ? dataset.name : name];
+                    }}
+                    labelFormatter={(label) => `Segundo: ${label}`}
+                  />
+                  <Legend content={() => null} />
+                  {filteredDatasets.map((dataset) => (
+                    <Line 
+                      key={dataset.id}
+                      type="monotone" 
+                      dataKey={`tp_resp_${dataset.id}`} 
+                      stroke={dataset.color} 
+                      name={`T. Respuesta_${dataset.id}`} 
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
             </div>
-            
-            <MetricSummaryTable 
-              datasets={filteredDatasets} 
-              metric="cpu_uso" 
-              title="Resumen: CPU Uso (%)" 
-              unit="%" 
-            />
             
             {/* Gráfico Uso CPU */}
-            <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-              <h3 className="text-lg font-semibold mb-4 text-gray-700">CPU Uso (%)</h3>
-              {renderLegend(filteredDatasets)}
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={combinedData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#edf2f7" />
-                    <XAxis 
-                      dataKey="label" 
-                      tick={{ fill: '#4a5568' }}
-                      axisLine={{ stroke: '#cbd5e0' }}
-                    />
-                    <YAxis 
-                      domain={[0, 100]} 
-                      tick={{ fill: '#4a5568' }}
-                      axisLine={{ stroke: '#cbd5e0' }}
-                    />
-                    <Tooltip 
-                      formatter={(value, name) => {
-                        const datasetId = name.split('_').pop();
-                        const dataset = datasets.find(d => d.id === parseInt(datasetId));
-                        return [`${value}%`, dataset ? dataset.name : name];
-                      }}
-                      labelFormatter={(label) => `Segundo: ${label}`}
-                      contentStyle={{ 
-                        borderRadius: '6px', 
-                        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)' 
-                      }}
-                    />
-                    <Legend content={() => null} />
-                    {filteredDatasets.map((dataset) => (
-                      <Line 
-                        key={dataset.id}
-                        type="monotone" 
-                        dataKey={`cpu_uso_${dataset.id}`} 
-                        stroke={dataset.color} 
-                        name={`CPU_${dataset.id}`}
-                        strokeWidth={2}
-                        dot={{ r: 3, fill: dataset.color, strokeWidth: 0 }}
-                        activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
-                      />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
+            <div className="bg-white p-4 rounded shadow">
+              <h3 className="text-md font-semibold mb-4">CPU Uso (%)</h3>
+              <div className="flex justify-end mb-2 text-sm flex-wrap">
+                {filteredDatasets.map((dataset, index) => (
+                  <span key={index} className="mr-4 mb-1">
+                    <span className="inline-block w-3 h-3 mr-1" style={{ backgroundColor: dataset.color }}></span> 
+                    {dataset.name}
+                  </span>
+                ))}
               </div>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={combinedData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="label" />
+                  <YAxis domain={[0, 100]} />
+                  <Tooltip 
+                    formatter={(value, name) => {
+                      const datasetId = name.split('_').pop();
+                      const dataset = datasets.find(d => d.id === parseInt(datasetId));
+                      return [`${value}%`, dataset ? dataset.name : name];
+                    }}
+                    labelFormatter={(label) => `Segundo: ${label}`}
+                  />
+                  <Legend content={() => null} />
+                  {filteredDatasets.map((dataset) => (
+                    <Line 
+                      key={dataset.id}
+                      type="monotone" 
+                      dataKey={`cpu_uso_${dataset.id}`} 
+                      stroke={dataset.color} 
+                      name={`CPU_${dataset.id}`} 
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
             </div>
-            
-            <MetricSummaryTable 
-              datasets={filteredDatasets} 
-              metric="ram_uso" 
-              title="Resumen: RAM Uso (%)" 
-              unit="%" 
-            />
             
             {/* Gráfico Uso RAM */}
-            <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-              <h3 className="text-lg font-semibold mb-4 text-gray-700">RAM Uso (%)</h3>
-              {renderLegend(filteredDatasets)}
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={combinedData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#edf2f7" />
-                    <XAxis 
-                      dataKey="label" 
-                      tick={{ fill: '#4a5568' }}
-                      axisLine={{ stroke: '#cbd5e0' }}
-                    />
-                    <YAxis 
-                      domain={[0, 100]} 
-                      tick={{ fill: '#4a5568' }}
-                      axisLine={{ stroke: '#cbd5e0' }}
-                    />
-                    <Tooltip 
-                      formatter={(value, name) => {
-                        const datasetId = name.split('_').pop();
-                        const dataset = datasets.find(d => d.id === parseInt(datasetId));
-                        return [`${value}%`, dataset ? dataset.name : name];
-                      }}
-                      labelFormatter={(label) => `Segundo: ${label}`}
-                      contentStyle={{ 
-                        borderRadius: '6px', 
-                        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)' 
-                      }}
-                    />
-                    <Legend content={() => null} />
-                    {filteredDatasets.map((dataset) => (
-                      <Line 
-                        key={dataset.id}
-                        type="monotone" 
-                        dataKey={`ram_uso_${dataset.id}`} 
-                        stroke={dataset.color} 
-                        name={`RAM_${dataset.id}`}
-                        strokeWidth={2}
-                        dot={{ r: 3, fill: dataset.color, strokeWidth: 0 }}
-                        activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
-                      />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
+            <div className="bg-white p-4 rounded shadow">
+              <h3 className="text-md font-semibold mb-4">RAM Uso (%)</h3>
+              <div className="flex justify-end mb-2 text-sm flex-wrap">
+                {filteredDatasets.map((dataset, index) => (
+                  <span key={index} className="mr-4 mb-1">
+                    <span className="inline-block w-3 h-3 mr-1" style={{ backgroundColor: dataset.color }}></span> 
+                    {dataset.name}
+                  </span>
+                ))}
               </div>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={combinedData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="label" />
+                  <YAxis domain={[0, 100]} />
+                  <Tooltip 
+                    formatter={(value, name) => {
+                      const datasetId = name.split('_').pop();
+                      const dataset = datasets.find(d => d.id === parseInt(datasetId));
+                      return [`${value}%`, dataset ? dataset.name : name];
+                    }}
+                    labelFormatter={(label) => `Segundo: ${label}`}
+                  />
+                  <Legend content={() => null} />
+                  {filteredDatasets.map((dataset) => (
+                    <Line 
+                      key={dataset.id}
+                      type="monotone" 
+                      dataKey={`ram_uso_${dataset.id}`} 
+                      stroke={dataset.color} 
+                      name={`RAM_${dataset.id}`} 
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
             </div>
-            
-            <MetricSummaryTable 
-              datasets={filteredDatasets} 
-              metric="latencia" 
-              title="Resumen: Latencia (ms)" 
-              unit=" ms" 
-            />
             
             {/* Gráfico Latencia */}
-            <div className="bg-white p-6 rounded-lg shadow-md mb-8">
-              <h3 className="text-lg font-semibold mb-4 text-gray-700">Latencia (ms)</h3>
-              {renderLegend(filteredDatasets)}
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={combinedData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#edf2f7" />
-                    <XAxis 
-                      dataKey="label" 
-                      tick={{ fill: '#4a5568' }}
-                      axisLine={{ stroke: '#cbd5e0' }}
-                    />
-                    <YAxis 
-                      tick={{ fill: '#4a5568' }}
-                      axisLine={{ stroke: '#cbd5e0' }}
-                    />
-                    <Tooltip 
-                      formatter={(value, name) => {
-                        const datasetId = name.split('_').pop();
-                        const dataset = datasets.find(d => d.id === parseInt(datasetId));
-                        return [`${value} ms`, dataset ? dataset.name : name];
-                      }}
-                      labelFormatter={(label) => `Segundo: ${label}`}
-                      contentStyle={{ 
-                        borderRadius: '6px', 
-                        boxShadow: '0 2px 10px rgba(0, 0, 0, 0.1)' 
-                      }}
-                    />
-                    <Legend content={() => null} />
-                    {filteredDatasets.map((dataset) => (
-                      <Line 
-                        key={dataset.id}
-                        type="monotone" 
-                        dataKey={`latencia_${dataset.id}`} 
-                        stroke={dataset.color} 
-                        name={`Latencia_${dataset.id}`}
-                        strokeWidth={2}
-                        dot={{ r: 3, fill: dataset.color, strokeWidth: 0 }}
-                        activeDot={{ r: 5, stroke: '#fff', strokeWidth: 2 }}
-                      />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
+            <div className="bg-white p-4 rounded shadow">
+              <h3 className="text-md font-semibold mb-4">Latencia (ms)</h3>
+              <div className="flex justify-end mb-2 text-sm flex-wrap">
+                {filteredDatasets.map((dataset, index) => (
+                  <span key={index} className="mr-4 mb-1">
+                    <span className="inline-block w-3 h-3 mr-1" style={{ backgroundColor: dataset.color }}></span> 
+                    {dataset.name}
+                  </span>
+                ))}
               </div>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={combinedData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="label" />
+                  <YAxis />
+                  <Tooltip 
+                    formatter={(value, name) => {
+                      const datasetId = name.split('_').pop();
+                      const dataset = datasets.find(d => d.id === parseInt(datasetId));
+                      return [`${value} ms`, dataset ? dataset.name : name];
+                    }}
+                    labelFormatter={(label) => `Segundo: ${label}`}
+                  />
+                  <Legend content={() => null} />
+                  {filteredDatasets.map((dataset) => (
+                    <Line 
+                      key={dataset.id}
+                      type="monotone" 
+                      dataKey={`latencia_${dataset.id}`} 
+                      stroke={dataset.color} 
+                      name={`Latencia_${dataset.id}`} 
+                    />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
             </div>
-            
-            {/* Datos recientes para cada dataset */}
-            <h2 className="text-xl font-semibold mb-6 text-gray-700">Datos Recientes</h2>
-            <div className="grid grid-cols-1 gap-6 mb-8">
-              {filteredDatasets.map((dataset) => (
-                <div 
-                  key={dataset.id} 
-                  className="bg-white p-6 rounded-lg shadow-md overflow-x-auto"
-                  style={{ borderLeft: `4px solid ${dataset.color}` }}
-                >
-                  <h3 className="text-lg font-semibold mb-4 text-gray-700">
-                    <div className="flex items-center">
-                      <span 
-                        className="w-3 h-3 rounded-full mr-2"
-                        style={{ backgroundColor: dataset.color }}
-                      ></span>
-                      {dataset.name} - Últimos registros
-                    </div>
-                  </h3>
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+          </div>
+          
+          {/* Tablas de valores promedio */}
+          <h2 className="text-xl font-bold mb-6 text-gray-800 bg-white p-4 rounded-lg shadow-lg border border-gray-200 border-l-4 border-l-orange-600 pl-6">Tablas de Valores Promedio</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+            {renderAveragesTable('num_peticiones', 'Peticiones por Segundo')}
+            {renderAveragesTable('tp_ejec', 'Tiempo de Ejecución', ' ms')}
+            {renderAveragesTable('tp_resp', 'Tiempo de Respuesta', ' ms')}
+            {renderAveragesTable('cpu_uso', 'CPU Uso', '%')}
+            {renderAveragesTable('ram_uso', 'RAM Uso', '%')}
+            {renderAveragesTable('latencia', 'Latencia', ' ms')}
+          </div>
+          
+          {/* Datos recientes para cada dataset */}
+          <h2 className="text-xl font-bold mb-6 text-gray-800 bg-white p-4 rounded-lg shadow-lg border border-gray-200 border-l-4 border-l-teal-600 pl-6">Últimos Registros por Archivo</h2>
+          <div className="grid grid-cols-1 gap-8 mb-10">
+            {filteredDatasets.map((dataset, index) => (
+              <div key={index} className="bg-white p-6 rounded-lg shadow-lg border-2 overflow-hidden" style={{ borderColor: dataset.color }}>
+                <h3 className="text-lg font-bold mb-4 flex items-center" style={{ color: dataset.color }}>
+                  <div className="w-5 h-5 mr-2 rounded" style={{ backgroundColor: dataset.color }}></div>
+                  {dataset.name} - Últimos registros
+                </h3>
+                <div className="overflow-x-auto shadow-inner rounded-lg border border-gray-200 bg-gray-50 p-1">
+                  <table className="min-w-full divide-y divide-gray-200 border">
+                    <thead className="bg-gray-100">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Momento</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Peticiones</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">T. Ejec</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">T. Resp</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">CPU %</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">RAM %</th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Latencia</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b-2 border-gray-300">Momento</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b-2 border-gray-300">Peticiones</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b-2 border-gray-300">T. Ejec</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b-2 border-gray-300">T. Resp</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b-2 border-gray-300">CPU %</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b-2 border-gray-300">RAM %</th>
+                        <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b-2 border-gray-300">Latencia</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {dataset.filteredData.slice(Math.max(0, dataset.filteredData.length - 5)).reverse().map((item, rowIndex) => (
-                        <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-gray-50' : ''}>
-                          <td className="px-4 py-3 whitespace-nowrap font-medium">{item.hora}</td>
-                          <td className="px-4 py-3 whitespace-nowrap">{item.num_peticiones}</td>
-                          <td className="px-4 py-3 whitespace-nowrap">{item.tp_ejec} ms</td>
-                          <td className="px-4 py-3 whitespace-nowrap">{item.tp_resp} ms</td>
-                          <td className="px-4 py-3 whitespace-nowrap">{item.cpu_uso}%</td>
-                          <td className="px-4 py-3 whitespace-nowrap">{item.ram_uso}%</td>
-                          <td className="px-4 py-3 whitespace-nowrap">{item.latencia} ms</td>
+                        <tr key={rowIndex} 
+                            className="hover:bg-gray-50 transition-colors duration-200"
+                            style={{ backgroundColor: rowIndex % 2 === 0 ? `${dataset.color}15` : 'white' }}>
+                          <td className="px-6 py-4 whitespace-nowrap font-medium">{item.hora}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{item.num_peticiones}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{item.tp_ejec} ms</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{item.tp_resp} ms</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{item.cpu_uso}%</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{item.ram_uso}%</td>
+                          <td className="px-6 py-4 whitespace-nowrap">{item.latencia} ms</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 };
