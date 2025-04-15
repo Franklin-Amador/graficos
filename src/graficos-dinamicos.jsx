@@ -733,7 +733,7 @@ const GraficosRendimiento = () => {
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8 bg-gray-100 min-h-screen">
-      <h1 className="text-3xl font-bold mb-8 text-center text-gray-800 border-b-4 border-blue-600 pb-4 max-w-3xl mx-auto">
+      <h1 className="text-3xl font-bold mb-8 text-center text-gray-800 border-b-4 border-blue-600 pb-4 max-w-4xl mx-auto">
         Análisis Comparativo de Rendimiento
       </h1>
 
@@ -906,37 +906,43 @@ const GraficosRendimiento = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
+          <div className="grid grid-cols-1 gap-8 mb-10">
             {/* Gráfico Peticiones por Segundo */}
             <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
               <h3 className="text-lg font-bold mb-4 text-gray-800 border-b-2 border-gray-200 pb-2">
                 Peticiones por Segundo
               </h3>
-              <div className="flex justify-end mb-4 text-sm flex-wrap bg-gray-50 p-2 rounded-lg">
-                {filteredDatasets.map((dataset, index) => (
-                  <span
-                    key={index}
-                    className="mr-4 mb-1 bg-white px-2 py-1 rounded-md shadow-sm border border-gray-200"
-                  >
+              <div className="flex justify-between mb-4 text-sm flex-wrap bg-gray-50 p-3 rounded-lg">
+                <h4 className="font-semibold text-gray-700">Leyenda:</h4>
+                <div className="flex flex-wrap">
+                  {filteredDatasets.map((dataset, index) => (
                     <span
-                      className="inline-block w-4 h-4 mr-2 rounded-sm"
-                      style={{ backgroundColor: dataset.color }}
-                    ></span>
-                    {dataset.name}
-                  </span>
-                ))}
+                      key={index}
+                      className="mr-4 mb-1 bg-white px-3 py-2 rounded-md shadow-sm border border-gray-200"
+                    >
+                      <span
+                        className="inline-block w-4 h-4 mr-2 rounded-sm"
+                        style={{ backgroundColor: dataset.color }}
+                      ></span>
+                      {dataset.name}
+                    </span>
+                  ))}
+                </div>
               </div>
               <div className="border border-gray-200 rounded-lg p-2 bg-gray-50">
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={400}>
                   <BarChart
                     data={combinedData}
-                    margin={{ top: 10, right: 30, left: 10, bottom: 10 }}
+                    margin={{ top: 10, right: 30, left: 10, bottom: 60 }} // Mayor margen inferior para etiquetas
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
                     <XAxis
                       dataKey="label"
                       tick={{ fill: "#4b5563" }}
                       tickFormatter={(value) => value.replace("fined", "")}
+                      height={40} // Aumentar altura para texto más legible
+                      angle={-45} // Inclinar etiquetas
+                      textAnchor="end" // Alinear texto al final
                     />
                     <YAxis
                       tick={{ fill: "#4b5563" }}
@@ -994,16 +1000,19 @@ const GraficosRendimiento = () => {
                 ))}
               </div>
               <div className="border border-gray-200 rounded-lg p-2 bg-gray-50">
-                <ResponsiveContainer width="100%" height={300}>
+                <ResponsiveContainer width="100%" height={400}>
                   <LineChart
                     data={combinedData}
-                    margin={{ top: 10, right: 30, left: 10, bottom: 10 }}
+                    margin={{ top: 10, right: 30, left: 10, bottom: 60 }} // Mayor margen inferior para etiquetas
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
                     <XAxis
                       dataKey="label"
                       tick={{ fill: "#4b5563" }}
-                      tickFormatter={(value) => value.replace("fined", "")} // Eliminar textos extraños
+                      tickFormatter={(value) => value.replace("fined", "")}
+                      height={40} // Aumentar altura para texto más legible
+                      angle={-45} // Inclinar etiquetas
+                      textAnchor="end" // Alinear texto al final
                     />
                     <YAxis
                       tick={{ fill: "#4b5563" }}
@@ -1067,13 +1076,16 @@ const GraficosRendimiento = () => {
                 <ResponsiveContainer width="100%" height={300}>
                   <LineChart
                     data={combinedData}
-                    margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
+                    margin={{ top: 10, right: 30, left: 10, bottom: 60 }} // Mayor margen inferior para etiquetas
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
                     <XAxis
                       dataKey="label"
                       tick={{ fill: "#4b5563" }}
                       tickFormatter={(value) => value.replace("fined", "")}
+                      height={40} // Aumentar altura para texto más legible
+                      angle={-45} // Inclinar etiquetas
+                      textAnchor="end" // Alinear texto al final
                     />
                     <YAxis tick={{ fill: "#4b5563" }} domain={[0, "auto"]} />
                     <Tooltip
@@ -1320,8 +1332,14 @@ const GraficosRendimiento = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
             {renderAveragesTable("num_peticiones", "Peticiones por Segundo")}
             {renderAveragesTable("tp_ejec", "Tiempo de Ejecución", " ms")}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
             {renderAveragesTable("tp_resp", "Tiempo de Respuesta", " ms")}
             {renderAveragesTable("cpu_uso", "CPU Uso", "%")}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
             {renderAveragesTable("ram_uso", "RAM Uso", "%")}
             {renderAveragesTable("latencia", "Latencia", " ms")}
           </div>
