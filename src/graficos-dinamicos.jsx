@@ -15,11 +15,11 @@ import Papa from "papaparse";
 import * as _ from "lodash";
 
 const GraficosRendimiento = () => {
-  const [datasets, setDatasets] = useState([]); // Array de datasets
+  const [datasets, setDatasets] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [filteredDatasets, setFilteredDatasets] = useState([]); // Datasets filtrados por tiempo
+  const [filteredDatasets, setFilteredDatasets] = useState([]);
   const [combinedData, setCombinedData] = useState([]);
-  const [timeRange, setTimeRange] = useState(60); // Mostrar los últimos X segundos
+  const [timeRange, setTimeRange] = useState(60);
   const [colors] = useState([
     "#2563EB", // azul intenso
     "#16A34A", // verde intenso
@@ -67,8 +67,12 @@ const GraficosRendimiento = () => {
               return value;
             },
             transformHeader: (header) => {
+              // Guardar el encabezado original para diagnóstico
+              console.log("Encabezado original:", header);
+
               // Normalizar nombres de encabezados para facilitar coincidencias
-              return header.trim().toLowerCase();
+              // PERO mantener el encabezado original para búsquedas exactas también
+              return header;
             },
           };
 
@@ -137,93 +141,228 @@ const GraficosRendimiento = () => {
   };
 
   const processDatos = (rawData, datasetId) => {
-    console.log("Datos recibidos en processDatos:", rawData.slice(0, 2)); // Muestra los primeros 2 registros
+    console.log("Datos recibidos en processDatos:", rawData.slice(0, 2));
 
-    // Validar que los campos requeridos existan en los datos
-    const requiredFields = [
-      "fecha_ejecucion",
-      "tp_ejec",
-      "tp_resp",
-      "cpu_uso",
-      "ram_uso",
-      "latencia",
-    ];
-    const fieldsExist = requiredFields.every((field) => {
-      const exists = rawData.length > 0 && field in rawData[0];
-      if (!exists) console.log(`Campo requerido no encontrado: ${field}`);
-      return exists;
-    });
-
-    // Si no existen los campos requeridos, intentar adaptarse a los campos disponibles
-    if (!fieldsExist) {
-      console.log("Intentando adaptar campos...");
-
-      // Verificar las columnas disponibles
-      const availableColumns = Object.keys(rawData[0] || {});
-      console.log("Columnas disponibles:", availableColumns);
-
-      // Mapa para columnas alternativas
-      const alternativeFields = {
-        fecha_ejecucion: ["fecha", "timestamp", "time", "date", "datetime"],
-        tp_ejec: [
-          "tiempo_ejecucion",
-          "execution_time",
-          "exec_time",
-          "time_execution",
-        ],
-        tp_resp: [
-          "tiempo_respuesta",
-          "response_time",
-          "resp_time",
-          "time_response",
-        ],
-        cpu_uso: ["cpu", "cpu_usage", "cpu_use", "procesador", "processor"],
-        ram_uso: ["ram", "ram_usage", "ram_use", "memoria", "memory"],
-        latencia: ["latency", "lag", "delay"],
-      };
-
-      // Intentar asignar campos alternativos si existen
-      for (const [requiredField, alternatives] of Object.entries(
-        alternativeFields,
-      )) {
-        const found = availableColumns.find(
-          (col) =>
-            alternatives.includes(col.toLowerCase()) ||
-            col.toLowerCase().includes(requiredField.toLowerCase()),
-        );
-
-        if (found) {
-          console.log(
-            `Campo alternativo encontrado para ${requiredField}: ${found}`,
-          );
-          // Crear una copia de los datos con el campo requerido mapeado
-          rawData = rawData.map((item) => ({
-            ...item,
-            [requiredField]: item[found],
-          }));
-        } else {
-          console.log(
-            `No se encontró alternativa para ${requiredField}. Usando valor por defecto.`,
-          );
-          // Crear un valor por defecto si no se encuentra el campo
-          rawData = rawData.map((item) => ({
-            ...item,
-            [requiredField]: requiredField.includes("fecha")
-              ? new Date().toISOString()
-              : 0,
-          }));
-        }
-      }
+    // Mostrar todas las propiedades disponibles en el primer objeto
+    if (rawData.length > 0) {
+      console.log("Propiedades disponibles en CSV:", Object.keys(rawData[0]));
     }
 
-    // Agrupar por segundo si existe fecha_ejecucion, si no generar timestamps secuenciales
-    let groupedBySecond;
+    // Mapeo de nombres de columnas específicos para tus CSV
+    const specificMappings = {
+      // Mapeos para fecha
+      timestamp: "fecha_ejecucion",
+      fechadeejecucion: "fecha_ejecucion",
+      "fecha de ejecucion": "fecha_ejecucion",
 
-    if (rawData.length > 0 && rawData[0].fecha_ejecucion) {
-      groupedBySecond = _.groupBy(rawData, "fecha_ejecucion");
-    } else {
-      // Generar timestamps secuenciales si no hay fecha_ejecucion
+      // Mapeos para CPU
+      cpuuso: "cpu_uso",
+      "cpu%": "cpu_uso",
+      cpu: "cpu_uso",
+
+      // Mapeos para RAM
+      ramuso: "ram_uso",
+      "memoria%": "ram_uso",
+      "memoria %": "ram_uso",
+      memoria: "ram_uso",
+      ramusadagb: "ram_uso",
+
+      // Mapeos para tiempos
+      tiempodeejecucion: "tp_ejec",
+      "tiempo de ejecucion": "tp_ejec",
+      tiempoderespuesta: "tp_resp",
+      "tiempo de respuesta": "tp_resp",
+
+      // Mapeos para latencia
+      latenciadered: "latencia",
+      "latencia de red": "latencia",
+
+      // Otros mapeos
+      discouso: "disco_uso",
+      peticionesporsegundo: "peticiones_seg",
+      "peticiones por segundo": "peticiones_seg",
+      cantidaddeusuarios: "usuarios",
+      "cantidad de usuarios": "usuarios",
+    };
+
+    // Pre-procesar los datos para asegurar que tengan los campos necesarios
+    // Muestra todas las columnas para diagnóstico
+    console.log("Columnas originales:", Object.keys(rawData[0] || {}));
+
+    // Pre-procesar nombres de columnas para normalización
+    const normalizedColumns = {};
+    if (rawData.length > 0) {
+      Object.keys(rawData[0]).forEach((key) => {
+        const normalizedKey = key
+          .toLowerCase()
+          .replace(/%/g, "")
+          .replace(/_/g, "")
+          .replace(/\s+/g, "");
+        normalizedColumns[normalizedKey] = key;
+      });
+    }
+    console.log("Columnas normalizadas:", normalizedColumns);
+
+    rawData = rawData.map((item) => {
+      const newItem = { ...item };
+
+      // Aplicar mapeos específicos primero
+      Object.keys(normalizedColumns).forEach((normalizedKey) => {
+        const originalKey = normalizedColumns[normalizedKey];
+
+        // Si es un mapeo específico, usar ese
+        if (specificMappings[normalizedKey]) {
+          const targetField = specificMappings[normalizedKey];
+          newItem[targetField] = item[originalKey];
+          console.log(
+            `Mapeando campo: ${originalKey} → ${targetField}, valor: ${item[originalKey]}`,
+          );
+        }
+      });
+
+      // Si no tiene fecha_ejecucion, usar timestamp o generar uno
+      if (!newItem.fecha_ejecucion) {
+        const timestampKey = Object.keys(item).find(
+          (k) =>
+            k.toLowerCase().includes("time") ||
+            k.toLowerCase().includes("fecha") ||
+            k.toLowerCase().includes("date") ||
+            k.toLowerCase() === "id", // Usar ID como último recurso para ordenación
+        );
+
+        if (timestampKey) {
+          if (timestampKey.toLowerCase() === "id") {
+            // Si usamos ID como timestamp, formatear como fecha
+            const id = parseInt(item[timestampKey]);
+            newItem.fecha_ejecucion = new Date(
+              Date.now() + id * 1000,
+            ).toISOString();
+          } else {
+            newItem.fecha_ejecucion = item[timestampKey];
+          }
+        } else {
+          newItem.fecha_ejecucion = new Date().toISOString();
+        }
+      }
+
+      // Asegurar que tiene cpu_uso - buscar exactamente CPU% primero
+      if (!newItem.cpu_uso) {
+        let cpuKey = Object.keys(item).find(
+          (k) => k === "CPU%" || k === "CPU %" || k === "Cpu%" || k === "cpu%",
+        );
+
+        if (!cpuKey) {
+          cpuKey = Object.keys(item).find(
+            (k) =>
+              k.toLowerCase().includes("cpu") ||
+              k.toLowerCase().includes("procesador"),
+          );
+        }
+
+        if (cpuKey) {
+          newItem.cpu_uso = item[cpuKey];
+          console.log(`Campo CPU encontrado: ${cpuKey} → ${item[cpuKey]}`);
+        } else {
+          newItem.cpu_uso = 0;
+        }
+      }
+
+      // Asegurar que tiene ram_uso - buscar exactamente Memoria % primero
+      if (!newItem.ram_uso) {
+        let ramKey = Object.keys(item).find(
+          (k) =>
+            k === "Memoria %" ||
+            k === "Memoria%" ||
+            k === "memoria %" ||
+            k === "memoria%",
+        );
+
+        if (!ramKey) {
+          ramKey = Object.keys(item).find(
+            (k) =>
+              k.toLowerCase().includes("ram") ||
+              k.toLowerCase().includes("memoria"),
+          );
+        }
+
+        if (ramKey) {
+          newItem.ram_uso = item[ramKey];
+          console.log(`Campo RAM encontrado: ${ramKey} → ${item[ramKey]}`);
+        } else {
+          newItem.ram_uso = 0;
+        }
+      }
+
+      // Asegurar que tiene tp_ejec - buscar exactamente Tiempo de ejecución primero
+      if (!newItem.tp_ejec) {
+        let tpEjecKey = Object.keys(item).find(
+          (k) =>
+            k === "Tiempo de ejecución" ||
+            k === "Tiempo de ejecucion" ||
+            k === "tiempo de ejecución" ||
+            k === "tiempo de ejecucion",
+        );
+
+        if (!tpEjecKey) {
+          tpEjecKey = Object.keys(item).find(
+            (k) =>
+              k.toLowerCase().includes("tiempo") &&
+              k.toLowerCase().includes("ejec"),
+          );
+        }
+
+        if (tpEjecKey) {
+          newItem.tp_ejec = item[tpEjecKey];
+          console.log(
+            `Campo TIEMPO EJECUCIÓN encontrado: ${tpEjecKey} → ${item[tpEjecKey]}`,
+          );
+        } else {
+          newItem.tp_ejec = 0;
+        }
+      }
+
+      // Asegurar que tiene tp_resp - buscar exactamente Tiempo de respuesta primero
+      if (!newItem.tp_resp) {
+        let tpRespKey = Object.keys(item).find(
+          (k) => k === "Tiempo de respuesta" || k === "tiempo de respuesta",
+        );
+
+        if (!tpRespKey) {
+          tpRespKey = Object.keys(item).find(
+            (k) =>
+              k.toLowerCase().includes("tiempo") &&
+              k.toLowerCase().includes("resp"),
+          );
+        }
+
+        if (tpRespKey) {
+          newItem.tp_resp = item[tpRespKey];
+          console.log(
+            `Campo TIEMPO RESPUESTA encontrado: ${tpRespKey} → ${item[tpRespKey]}`,
+          );
+        } else {
+          newItem.tp_resp = 0;
+        }
+      }
+
+      // Establecer valores por defecto para campos que no se encuentren
+      newItem.tp_ejec = newItem.tp_ejec || 0;
+      newItem.tp_resp = newItem.tp_resp || 0;
+      newItem.latencia = newItem.latencia || 0;
+      newItem.peticiones_seg = newItem.peticiones_seg || 1;
+      newItem.num_peticiones = newItem.num_peticiones || 1;
+
+      return newItem;
+    });
+
+    // Crear un campo de timestamp consistente si no existe
+    let useSequentialTime = false;
+    if (!rawData.some((item) => item.fecha_ejecucion)) {
+      useSequentialTime = true;
       console.log("Generando timestamps secuenciales...");
+    }
+
+    if (useSequentialTime) {
       const startTime = new Date();
       rawData = rawData.map((item, index) => {
         const timestamp = new Date(
@@ -231,8 +370,9 @@ const GraficosRendimiento = () => {
         ).toISOString();
         return { ...item, fecha_ejecucion: timestamp };
       });
-      groupedBySecond = _.groupBy(rawData, "fecha_ejecucion");
     }
+
+    const groupedBySecond = _.groupBy(rawData, "fecha_ejecucion");
 
     const promediosPorSegundo = Object.entries(groupedBySecond).map(
       ([segundo, peticiones], index) => {
@@ -370,16 +510,45 @@ const GraficosRendimiento = () => {
 
   // Función para convertir valores a números válidos
   const parsearValorNumerico = (valor) => {
-    if (valor === null || valor === undefined || isNaN(parseFloat(valor))) {
+    // Si es un string, intentar limpiarlo y convertirlo
+    if (typeof valor === "string") {
+      // Primero reemplazar comas por puntos (formato europeo)
+      valor = valor.replace(",", ".");
+
+      // Quitar cualquier símbolo % si existe
+      valor = valor.replace("%", "");
+
+      // Intentar convertir a número
+      valor = parseFloat(valor);
+    }
+
+    // Verificar si el valor es un número válido
+    if (valor === null || valor === undefined || isNaN(valor)) {
       return 0;
     }
+
+    // Redondear a 2 decimales
     return parseFloat(parseFloat(valor).toFixed(2));
   };
 
   const updateFilteredData = (allDatasets, range) => {
+    console.log("Actualizando datos filtrados con rango:", range);
+
     // Filtrar cada dataset para mostrar solo los últimos 'range' segundos
     const filtered = allDatasets.map((dataset) => {
+      if (!dataset.data || !Array.isArray(dataset.data)) {
+        console.error("Error: dataset.data no es un array:", dataset);
+        return {
+          ...dataset,
+          filteredData: [],
+        };
+      }
+
       const dataLength = dataset.data.length;
+      console.log(
+        `Dataset ${dataset.id} (${dataset.name}): ${dataLength} registros`,
+      );
+
       return {
         ...dataset,
         filteredData:
@@ -416,12 +585,18 @@ const GraficosRendimiento = () => {
         const item =
           dataset.filteredData.find((item) => item.label === label) || {};
 
-        dataPoint[`tp_ejec_${dataset.id}`] = item.tp_ejec || 0;
-        dataPoint[`tp_resp_${dataset.id}`] = item.tp_resp || 0;
-        dataPoint[`cpu_uso_${dataset.id}`] = item.cpu_uso || 0;
-        dataPoint[`ram_uso_${dataset.id}`] = item.ram_uso || 0;
-        dataPoint[`latencia_${dataset.id}`] = item.latencia || 0;
-        dataPoint[`num_peticiones_${dataset.id}`] = item.num_peticiones || 0;
+        dataPoint[`tp_ejec_${dataset.id}`] =
+          parsearValorNumerico(item.tp_ejec) || 0;
+        dataPoint[`tp_resp_${dataset.id}`] =
+          parsearValorNumerico(item.tp_resp) || 0;
+        dataPoint[`cpu_uso_${dataset.id}`] =
+          parsearValorNumerico(item.cpu_uso) || 0;
+        dataPoint[`ram_uso_${dataset.id}`] =
+          parsearValorNumerico(item.ram_uso) || 0;
+        dataPoint[`latencia_${dataset.id}`] =
+          parsearValorNumerico(item.latencia) || 0;
+        dataPoint[`num_peticiones_${dataset.id}`] =
+          parsearValorNumerico(item.num_peticiones) || 0;
         dataPoint[`hora_${dataset.id}`] = item.hora || "";
         dataPoint[`endpoint_${dataset.id}`] = item.endpoint || "";
       });
@@ -486,7 +661,9 @@ const GraficosRendimiento = () => {
     // Calcular promedio para cada dataset en el período de tiempo filtrado
     const averages = filteredDatasets.map((dataset) => {
       const values = dataset.filteredData.map((item) => item[metric]);
-      const avg = values.reduce((sum, val) => sum + val, 0) / values.length;
+      const avg =
+        values.reduce((sum, val) => sum + parsearValorNumerico(val), 0) /
+        values.length;
       return {
         id: dataset.id,
         name: dataset.name,
@@ -729,7 +906,7 @@ const GraficosRendimiento = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
             {/* Gráfico Peticiones por Segundo */}
             <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
               <h3 className="text-lg font-bold mb-4 text-gray-800 border-b-2 border-gray-200 pb-2">
@@ -763,7 +940,7 @@ const GraficosRendimiento = () => {
                     />
                     <YAxis
                       tick={{ fill: "#4b5563" }}
-                      domain={["auto", "auto"]} // Auto-escalar
+                      domain={[0, "auto"]} // Auto-escalar desde 0
                     />
                     <Tooltip
                       formatter={(value, name) => {
@@ -830,7 +1007,7 @@ const GraficosRendimiento = () => {
                     />
                     <YAxis
                       tick={{ fill: "#4b5563" }}
-                      domain={["auto", "auto"]} // Hacer que el dominio se ajuste automáticamente
+                      domain={[0, "auto"]} // Hacer que el dominio se ajuste automáticamente
                     />
                     <Tooltip
                       formatter={(value, name) => {
@@ -893,8 +1070,12 @@ const GraficosRendimiento = () => {
                     margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
-                    <XAxis dataKey="label" tick={{ fill: "#4b5563" }} />
-                    <YAxis tick={{ fill: "#4b5563" }} />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fill: "#4b5563" }}
+                      tickFormatter={(value) => value.replace("fined", "")}
+                    />
+                    <YAxis tick={{ fill: "#4b5563" }} domain={[0, "auto"]} />
                     <Tooltip
                       formatter={(value, name) => {
                         const datasetId = name.split("_").pop();
@@ -956,7 +1137,11 @@ const GraficosRendimiento = () => {
                     margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
-                    <XAxis dataKey="label" tick={{ fill: "#4b5563" }} />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fill: "#4b5563" }}
+                      tickFormatter={(value) => value.replace("fined", "")}
+                    />
                     <YAxis domain={[0, 100]} tick={{ fill: "#4b5563" }} />
                     <Tooltip
                       formatter={(value, name) => {
@@ -1019,7 +1204,11 @@ const GraficosRendimiento = () => {
                     margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
-                    <XAxis dataKey="label" tick={{ fill: "#4b5563" }} />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fill: "#4b5563" }}
+                      tickFormatter={(value) => value.replace("fined", "")}
+                    />
                     <YAxis domain={[0, 100]} tick={{ fill: "#4b5563" }} />
                     <Tooltip
                       formatter={(value, name) => {
@@ -1082,8 +1271,12 @@ const GraficosRendimiento = () => {
                     margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#ccc" />
-                    <XAxis dataKey="label" tick={{ fill: "#4b5563" }} />
-                    <YAxis tick={{ fill: "#4b5563" }} />
+                    <XAxis
+                      dataKey="label"
+                      tick={{ fill: "#4b5563" }}
+                      tickFormatter={(value) => value.replace("fined", "")}
+                    />
+                    <YAxis tick={{ fill: "#4b5563" }} domain={[0, "auto"]} />
                     <Tooltip
                       formatter={(value, name) => {
                         const datasetId = name.split("_").pop();
