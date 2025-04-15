@@ -910,7 +910,7 @@ const GraficosRendimiento = () => {
             {/* Gráfico Peticiones por Segundo */}
             <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
               <h3 className="text-lg font-bold mb-4 text-gray-800 border-b-2 border-gray-200 pb-2">
-                Peticiones por Segundo
+                Peticiones por Segundo (req)
               </h3>
               <div className="flex justify-between mb-4 text-sm flex-wrap bg-gray-50 p-3 rounded-lg">
                 <h4 className="font-semibold text-gray-700">Leyenda:</h4>
@@ -983,7 +983,7 @@ const GraficosRendimiento = () => {
             {/* Gráfico Tiempo de Ejecución */}
             <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
               <h3 className="text-lg font-bold mb-4 text-gray-800 border-b-2 border-gray-200 pb-2">
-                Tiempo de Ejecución
+                Tiempo de Ejecución (ms)
               </h3>
               <div className="flex justify-end mb-4 text-sm flex-wrap bg-gray-50 p-2 rounded-lg">
                 {filteredDatasets.map((dataset, index) => (
@@ -1056,7 +1056,7 @@ const GraficosRendimiento = () => {
             {/* Gráfico Tiempo de Respuesta */}
             <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
               <h3 className="text-lg font-bold mb-4 text-gray-800 border-b-2 border-gray-200 pb-2">
-                Tiempo de Respuesta
+                Tiempo de Respuesta (ms)
               </h3>
               <div className="flex justify-end mb-4 text-sm flex-wrap bg-gray-50 p-2 rounded-lg">
                 {filteredDatasets.map((dataset, index) => (
@@ -1436,10 +1436,83 @@ const GraficosRendimiento = () => {
               </div>
             ))}
           </div>
+
+            {/* Probandooooooo */}
+        <div className="bg-white p-6 rounded-lg shadow-lg border border-gray-200 mb-10">
+        <h3 className="text-lg font-bold mb-4 text-gray-800 border-b-2 border-gray-200 pb-2">
+          Promedios por Muestra
+        </h3>
+        <div className="overflow-x-auto bg-white-100">
+          <table className="min-w-full divide-y divide-gray-200 border">
+            <thead className="bg-white-100">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b-2 border-gray-300">
+                  Archivo
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b-2 border-gray-300">
+                  Peticiones/s
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b-2 border-gray-300">
+                  T. Ejec (ms)
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b-2 border-gray-300">
+                  T. Resp (ms)
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b-2 border-gray-300">
+                  CPU (%)
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b-2 border-gray-300">
+                  RAM (%)
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-b-2 border-gray-300">
+                  Latencia (ms)
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {datasets.map((dataset, index) => (
+                <tr
+                  key={index}
+                  className="hover:bg-gray-50 transition-colors duration-200"
+                  style={{
+                    backgroundColor: `${dataset.color}15`,
+                  }}
+                >
+                  <td className="px-6 py-4 whitespace-nowrap font-medium">
+                    {dataset.name}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {dataset.stats.promedioPeticionesPorSegundo}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {dataset.stats.promedioTiempoEjecucion} ms
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {dataset.stats.promedioTiempoRespuesta} ms
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {dataset.stats.promedioCPU}%
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {dataset.stats.promedioRAM}%
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    {dataset.stats.promedioLatencia} ms
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        </div>
+       
         </>
       )}
     </div>
   );
+
 };
 
 export default GraficosRendimiento;
+
